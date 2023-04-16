@@ -1,0 +1,9 @@
+[theme]
+primaryColor="#B19FF9"
+backgroundColor="#28263D"
+secondaryBackgroundColor="#282E56" # what is this?
+
+textColor="#F9F6EF"
+
+[server]
+runOnSave = true
