@@ -1,0 +1,11 @@
+jupyter
+ipywidgets
+torchvision
+scikit-image
+matplotlib
+tqdm
+torch
+numpy
+pandas
+Pillow
+streamlit
