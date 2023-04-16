@@ -126,7 +126,7 @@ model = Encoder_Decoder()
 to_device(model, device)
 
 def load_checkpoint(filepath):
-    checkpoint = torch.load(filepath)
+    checkpoint = torch.load(filepath, map_location='cpu')
     model = checkpoint['model']
     model.load_state_dict(checkpoint['state_dict'])
     for parameter in model.parameters():
@@ -135,10 +135,10 @@ def load_checkpoint(filepath):
     return model
 
 # model_gen = load_checkpoint('Fruit_test.pth', map_location='cpu')
-model_fruit = load_checkpoint('FruitsVeg_30Epochs_test.pth')
-model_animal = load_checkpoint('animal_20e_test.pth')
-model_people = load_checkpoint('faces_test_20epoch.pth')
-model_land = load_checkpoint('landscape-e29-test.pth')
+model_fruit = load_checkpoint('fruits_test.pth')
+model_animal = load_checkpoint('animals_test.pth')
+model_people = load_checkpoint('faces_test.pth')
+model_land = load_checkpoint('landscapes_test.pth')
 
 model = model_fruit # model = model_gen
 # print(model)
@@ -225,7 +225,7 @@ if uploaded_file is None:
 
 btn = st.button("COLORISE")
 if(btn and uploaded_file):
-    if chosenModel=='Landscape':
+    if chosenModel=='Landscapes':
         m='l'
     elif chosenModel=='Fruits':
         m='f'
