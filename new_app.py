@@ -1,11 +1,12 @@
 import streamlit as st
 import requests
 from io import BytesIO
-
-
 import numpy as np
 import pandas as pd
-#import os
+
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
+
 from torchvision.datasets import ImageFolder
 import torchvision.transforms as T
 import torch
@@ -18,8 +19,6 @@ import matplotlib.pyplot as plt
 from skimage.color import rgb2lab, lab2rgb  #, rgb2gray
 from PIL import Image
 
-import os
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -127,7 +126,7 @@ model = Encoder_Decoder()
 to_device(model, device)
 
 def load_checkpoint(filepath):
-    checkpoint = torch.load(filepath, map_location='cpu')
+    checkpoint = torch.load(filepath)
     model = checkpoint['model']
     model.load_state_dict(checkpoint['state_dict'])
     for parameter in model.parameters():
@@ -135,11 +134,11 @@ def load_checkpoint(filepath):
     model.eval()
     return model
 
-# model_gen = load_checkpoint('Fruit_test.pth')
-model_fruit = load_checkpoint('fruitveg_20epochs.pth')
+# model_gen = load_checkpoint('Fruit_test.pth', map_location='cpu')
+model_fruit = load_checkpoint('FruitsVeg_30Epochs_test.pth')
 model_animal = load_checkpoint('animal_20e_test.pth')
 model_people = load_checkpoint('faces_test_20epoch.pth')
-model_land = load_checkpoint('landscape_15epochs.pth')
+model_land = load_checkpoint('landscape-e29-test.pth')
 
 model = model_fruit # model = model_gen
 # print(model)
