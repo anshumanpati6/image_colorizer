@@ -1,32 +1,30 @@
+## importing libraries
+
 import streamlit as st
 import requests
 from io import BytesIO
 import numpy as np
-import pandas as pd
-
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
-
-from torchvision.datasets import ImageFolder
 import torchvision.transforms as T
 import torch
 import torch.nn as nn
-# from torch.utils.data import DataLoader
 from torch.utils.data.dataset import random_split
 import torch.nn.functional as F
-# from tqdm.notebook import tqdm
-import matplotlib.pyplot as plt
-from skimage.color import rgb2lab, lab2rgb  #, rgb2gray
+from skimage.color import rgb2lab, lab2rgb
 from PIL import Image
 
+## setting device for running of the model using device fruntion from torch
 
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"  ###uncomment when cpu only maching
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
+## pre-trained weights to device
 def to_device(data, device):
     if isinstance(data, (list, tuple)):
         return [to_device(x, device) for x in data]
     return data.to(device, non_blocking = True)
 
+## converting images from rgb format to L_ab format
 def generate_l_ab(images): 
     lab = rgb2lab(images.permute(0, 2, 3, 1).cpu().numpy())
     X = lab[:,:,:,0]
@@ -34,6 +32,7 @@ def generate_l_ab(images):
     Y = lab[:,:,:,1:] / 128
     return to_device(torch.tensor(X, dtype = torch.float).permute(0, 3, 1, 2), device),to_device(torch.tensor(Y, dtype = torch.float).permute(0, 3, 1, 2), device)
 
+## BaseModel class declared in order to satisfy dependencies during Encoder_Decoder()
 class BaseModel(nn.Module):
     def training_batch(self, batch):
         images, _ = batch
@@ -52,30 +51,13 @@ class BaseModel(nn.Module):
     def validation_end_epoch(self, outputs):
         epoch_loss = sum([x['val_loss'] for x in outputs]) / len(outputs)
         return {'epoch_loss' : epoch_loss}
-    
-class BaseModel(nn.Module):
-    def training_batch(self, batch):
-        images, _ = batch
-        X, Y = generate_l_ab(images)
-        outputs = self.forward(X)
-        loss = F.mse_loss(outputs, Y)
-        return loss
 
-    def validation_batch(self, batch):
-        images, _ = batch
-        X, Y = generate_l_ab(images)
-        outputs = self.forward(X)
-        loss = F.mse_loss(outputs, Y)
-        return {'val_loss' : loss.item()}
-
-    def validation_end_epoch(self, outputs):
-        epoch_loss = sum([x['val_loss'] for x in outputs]) / len(outputs)
-        return {'epoch_loss' : epoch_loss}
-    
+## using the formula to calculate padding
 def get_padding(kernel_size: int, stride: int = 1, dilation: int = 1, **_) -> int:
     padding = ((stride - 1) + dilation * (kernel_size - 1)) // 2
     return padding
-    
+
+## the auto-encoder model to run when provided with the weights
 class Encoder_Decoder(BaseModel):
     def __init__(self):
         super().__init__()
@@ -121,12 +103,15 @@ class Encoder_Decoder(BaseModel):
 
     def forward(self, images):
         return self.network(images)
-    
+
+## initialising the model variable  
 model = Encoder_Decoder()
 to_device(model, device)
 
+## function to load a model using pre-trained weights
 def load_checkpoint(filepath):
-    checkpoint = torch.load(filepath, map_location='cpu')
+    checkpoint = torch.load(filepath, map_location='cpu')  ##uncomment for cpu-only machines
+    # checkpoint = torch.load(filepath)                    ##uncomment for cuda-available machines
     model = checkpoint['model']
     model.load_state_dict(checkpoint['state_dict'])
     for parameter in model.parameters():
@@ -134,16 +119,17 @@ def load_checkpoint(filepath):
     model.eval()
     return model
 
-# model_gen = load_checkpoint('Fruit_test.pth', map_location='cpu')
+## initialsing model_xxxx variables with pre-trained weights
+# model_gen = load_checkpoint('genralised_test.pth')  ##unavailable model due to lack of resources
 model_fruit = load_checkpoint('fruits_test.pth')
 model_animal = load_checkpoint('animals_test.pth')
 model_people = load_checkpoint('faces_test.pth')
 model_land = load_checkpoint('landscapes_test.pth')
 
 model = model_fruit # model = model_gen
-# print(model)
 to_device(model, device)
 
+## function to convert image from L_ab format to rgb format for front-end presentation
 def to_rgb(grayscale_input, ab_output, save_path=None, save_name=None):
     color_image = torch.cat((grayscale_input, ab_output), 0).numpy() # combine channels
     color_image = color_image.transpose((1, 2, 0))  # rescale for matplotlib
@@ -153,6 +139,7 @@ def to_rgb(grayscale_input, ab_output, save_path=None, save_name=None):
     grayscale_input = grayscale_input.squeeze().numpy()
     return color_image
 
+## executing the auto-encoder in this function in order to provide predicted colorized version of the grayscale image
 def prediction(img, m):
     if(m == "l"):
         model = model_land
@@ -175,8 +162,9 @@ def prediction(img, m):
     ab_img = ab_img.squeeze(0)
     return to_rgb(xb.detach().cpu(), ab_img.detach().cpu())
 
-###
+##################################################################################################################################
 
+## utility functions to image to feasible formats for the prediction function to access
 def transform_image(image):  # convert all images into a similar size
     test_transforms = T.Compose([T.Resize((256, 256)), T.ToTensor()])
     return test_transforms(image)
@@ -186,7 +174,10 @@ def convert_to_tensor(image):
     if(tensor.shape[0] == 1):
         tensor = tensor.repeat(3, 1, 1)
     return tensor
+
 ###################################################################################################################################
+
+## initialising the streamlit page
 st.set_page_config(
 
     page_title="Image Colorizer",
@@ -195,18 +186,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+st.title('Image Colorizer')
+
+## attaching the css style sheet
 with open('style.css') as f :
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-
-st.title('Image colouriser')
-
-# st.write("""
-# # H1 heading
-# """)
-
+## sidebar declaration, model will be selected here
 chosenModel=st.sidebar.selectbox("Select a model",("Landscape","Fruits","Animals","Faces"))
 
+## uploading of file via uploader or url
 uploaded_file = st.file_uploader("Choose a file")
 image_url = st.text_input("URL : ")
 
@@ -221,11 +210,12 @@ if uploaded_file is None and image_url:
 if uploaded_file is None:
     st.write('Please upload an image or provide a url')
 
-#########################################################################################################
+## declaration of button that in turn will call the prediction function
+btn = st.button("COLORIZE")
 
-btn = st.button("COLORISE")
+## with updated uploaded_file, on click of button execute prediction
 if(btn and uploaded_file):
-    if chosenModel=='Landscapes':
+    if chosenModel=='Landscape':
         m='l'
     elif chosenModel=='Fruits':
         m='f'
@@ -235,17 +225,19 @@ if(btn and uploaded_file):
         m='p'
     else:
         m='x'
-    # st.write(m)
     img = Image.open(uploaded_file)
     width, height = img.size
     tensor = transform_image(img)
     output = prediction(tensor, m)
     result = Image.fromarray((output*255).astype(np.uint8))
-    st.image(uploaded_file, caption = "B/W", width = 300)
     # st.image(result, caption = "colorised")
     new_result = result.resize((width, height))
-    st.image(new_result, caption = "Colorized", width = 300)
-    # st.write("button works")
+
+    col1, col2 = st.columns(2)
+    col1.header("B/W")
+    col1.image(img, width=300)
+    col2.header("Colorized")
+    col2.image(new_result, width=300)
 
 else:
     st.write("Upload an image")
